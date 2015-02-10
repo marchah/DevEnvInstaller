@@ -1,14 +1,18 @@
 # DevEnvInstaller
 Shell Script to install dev softwares
 
-Functionalities
-================
-
+Functionalities Tested
+======================
+* CheckRequirement
+  * Debian 7.8
+* GetDistributionType
+  * Debian 7.8
 * Update Softwares & System
-  * Ubuntu Server 12.10
-  * Ubuntu Desktop
 * Install Emacs
+  * Debian 7.8
 * Install NodeJS
+  * Debian 7.8
 * Install MongoDB
 * Install AndroidStudio
+  * Debian 7.8 in process
 * Cleaning

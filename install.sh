@@ -13,12 +13,54 @@ DEV_FOLDER_PATH="/home/$DEV_USER/dev/"
 
 CONF_FILE_EMACS_ALIAS="alias emacs='emacs -nw'"
 
-CONF_FILE_USER="/home/$DEV_USER/conf_file_user"
-CONF_FILE_ROOT="/root/conf_file_root"
+CONF_FILE_USER="/home/$DEV_USER/.bashrc"
+CONF_FILE_ROOT="/root/.bashrc"
 
 ANDROID_STUDIO_DDL_LINK="https://dl.google.com/dl/android/studio/ide-zips/1.0.1/android-studio-ide-135.1641136-linux.zip"
 ANDROID_STUDIO_ARCHIVE_NAME="android-studio.zip"
 ANDROID_STUDIO_ARCHIVE_PATH="/tmp/$ANDROID_STUDIO_ARCHIVE_NAME"
+
+ANDROID_SDK_DDL_LINK="dl.google.com/android/android-sdk_r24.0.2-linux.tgz"
+ANDROID_SDK_ARCHIVE_NAME="android-sdk.tgz"
+ANDROID_SDK_ARCHIVE_PATH="/tmp/$ANDROID_SDK_ARCHIVE_NAME"
+ANDROID_SDK_FOLDER_NAME="android-sdk-linux"
+
+DISTR=""
+
+getDistributionType()
+{
+    local dtype
+    # Assume unknown
+    dtype="unknown"
+
+    # First test against Fedora / RHEL / CentOS / generic Redhat derivative
+    if [ -r /etc/rc.d/init.d/functions ]; then
+        source /etc/rc.d/init.d/functions
+        [ zz`type -t passed 2>/dev/null` == "zzfunction" ] && dtype="redhat"
+
+    # Then test against SUSE (must be after Redhat,
+    # I've seen rc.status on Ubuntu I think? TODO: Recheck that)
+    elif [ -r /etc/rc.status ]; then
+        source /etc/rc.status
+        [ zz`type -t rc_reset 2>/dev/null` == "zzfunction" ] && dtype="suse"
+
+    # Then test against Debian, Ubuntu and friends
+    elif [ -r /lib/lsb/init-functions ]; then
+        source /lib/lsb/init-functions
+        [ zz`type -t log_begin_msg 2>/dev/null` == "zzfunction" ] && dtype="debian"
+
+    # Then test against Gentoo
+    elif [ -r /etc/init.d/functions.sh ]; then
+        source /etc/init.d/functions.sh
+        [ zz`type -t ebegin 2>/dev/null` == "zzfunction" ] && dtype="gentoo"
+
+    # For Slackware we currently just test if /etc/slackware-version exists
+    # and isn't empty (TODO: Find a better way :)
+    elif [ -s /etc/slackware-version ]; then
+        dtype="slackware"
+    fi
+    DISTR=$dtype
+}
 
 function checkIfInstalled() {
     if hash $1 2>/dev/null; then
@@ -74,7 +116,7 @@ function installNodeJS() {
     if ! checkIfInstalled "node";
     then
 	curl -sL https://deb.nodesource.com/setup | bash -;
-	apt-get install -y nodejs;
+	apt-get install -y nodejs -qq;
     fi
    echo -e "$CYAN**** INSTALL NODE.JS DONE ****$NORMAL"
 }
@@ -83,10 +125,17 @@ function installMongoDB() {
     echo -e "$CYAN**** INSTALLING MONGODB ****$NORMAL"
     if ! checkIfInstalled "mongo";
     then
-	apt-key adv --keyserver keyserver.ubuntu.com:80 --recv 7F0CEB10;
-	echo 'deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen' | tee /etc/apt/sources.list.d/mongodb.list;
-	apt-get update;
-	apt-get install -y mongodb-org;
+	if [ "$DISTR" == "ubuntu" ]; then
+	    apt-key adv --keyserver keyserver.ubuntu.com:80 --recv 7F0CEB10;
+	    echo 'deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen' | tee /etc/apt/sources.list.d/mongodb.list;
+	elif [ "$DISTR" == "debian" ]; then
+	    apt-key adv --keyserver keyserver.ubuntu.com:80 --recv 7F0CEB10;
+	    echo 'deb http://downloads-distro.mongodb.org/repo/debian-sysinit dist 10gen' | tee /etc/apt/sources.list.d/mongodb.list;
+	else
+	    echo "MongoDB installation not supported on $DISTRO"
+	fi
+	apt-get update -qq;
+	apt-get install --force-yes mongodb-org -qq;
 	checkIfInstallSuccess $? "MongoDB" "installation"
 	service mongod start
 	checkIfInstallSuccess $? "MongoDB" "start"
@@ -95,15 +144,26 @@ function installMongoDB() {
 }
 
 function installAndroidStudio() {
-    # probably will need JDK
     echo -e "$CYAN**** INSTALLING ANDROID STUDIO ****$NORMAL"
-    rm -f $ANDROID_STUDIO_ARCHIVE_PATH
+    if ! checkIfInstalled "javac"; then
+	echo -e "     $GREEN 0) Installing JDK$NORMAL"
+	apt-get install -y -qq openjdk-7-jdk
+	export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-i386/
+    fi
+    #rm -f $ANDROID_STUDIO_ARCHIVE_PATH
     echo -e "     $GREEN 1) Downloading AndroidStudio$NORMAL"
-    wget -O $ANDROID_STUDIO_ARCHIVE_PATH $ANDROID_STUDIO_DDL_LINK
+    #wget -O $ANDROID_STUDIO_ARCHIVE_PATH $ANDROID_STUDIO_DDL_LINK
     echo -e "     $GREEN 2) Unzip AndroidStudio Archive$NORMAL"
-    unzip -q $ANDROID_STUDIO_ARCHIVE_PATH -d $DEV_FOLDER_PATH
-    echo -e "     $GREEN 3) Install SDKs"
-    # echo yes | android update sdk --all --no-ui --force
+    #unzip -q $ANDROID_STUDIO_ARCHIVE_PATH -d $DEV_FOLDER_PATH
+
+#    rm -f $ANDROID_SDK_ARCHIVE_PATH
+    echo -e "     $GREEN 3) Downloading Android SDK$NORMAL"
+ #   wget -O $ANDROID_SDK_ARCHIVE_PATH $ANDROID_SDK_DDL_LINK
+    echo -e "     $GREEN 4) Unzip Android SDK Archive$NORMAL"
+    tar xzf $ANDROID_SDK_ARCHIVE_PATH
+    mv $ANDROID_SDK_FOLDER_NAME $DEV_FOLDER_PATH/.
+    echo -e "     $GREEN 5) Install SDKs"
+#    echo yes | android update sdk --all --no-ui --force
     echo -e "$CYAN**** INSTALL ANDROID STUDIO DONE ****$NORMAL"
 }
 
@@ -114,9 +174,14 @@ fi
 
 mkdir -p $DEV_FOLDER_PATH
 checkRequirement
+getDistributionType
 #updateSoftware
 #installEmacs
-#installNodeJS
-#installMongoDB
+installNodeJS
+installMongoDB
 installAndroidStudio
 #cleaning
+
+# TODO
+#alias clean
+#exit shell to reload .bashrc
