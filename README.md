@@ -3,6 +3,9 @@ Shell Script to install dev softwares
 
 Functionalities Tested
 ======================
+
+find where folder dev is created and why
+
 * CheckRequirement
   * Debian 7.8
   * Ubuntu 14.10 
