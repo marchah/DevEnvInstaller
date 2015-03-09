@@ -176,10 +176,10 @@ mkdir -p $DEV_FOLDER_PATH
 checkRequirement
 getDistributionType
 #updateSoftware
-#installEmacs
+installEmacs
 installNodeJS
 installMongoDB
-installAndroidStudio
+#installAndroidStudio
 #cleaning
 
 # TODO
